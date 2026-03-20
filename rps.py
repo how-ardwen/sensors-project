@@ -23,9 +23,13 @@ import random
 
 from bleak import BleakClient, BleakScanner
 
+import cv_bridge
+
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
+
+NO_BLE = True
 
 # Name advertised by the ESP32 (change to match your firmware)
 ESP32_BLE_NAME = "RPS-ESP32"
@@ -76,14 +80,21 @@ def build_packet(left: str, right: str) -> bytes:
     return f"P{l_code}{r_code}\n".encode("ascii")
 
 
-async def ble_send(client: BleakClient, packet: bytes) -> None:
-    """Write a packet to the ESP32's UART TX characteristic."""
+async def ble_send(client, packet: bytes) -> None:
+    """Write a packet to the ESP32's UART TX characteristic (unless NO_BLE)."""
+    if NO_BLE or client is None:
+        print(f"  [BLE →] (skipped) {packet!r}")
+        return
     await client.write_gatt_char(UART_TX_CHAR_UUID, packet, response=False)
     print(f"  [BLE →] {packet!r}")
 
 
-async def ble_connect() -> BleakClient:
-    """Scan for and connect to the ESP32 by its advertised name."""
+async def ble_connect():
+    """Scan for and connect to the ESP32 by its advertised name (unless NO_BLE)."""
+    if NO_BLE:
+        print("  [BLE] NO_BLE=True → skipping BLE connect (test mode).")
+        return None
+
     print(f"  Scanning for '{ESP32_BLE_NAME}'…")
     device = await BleakScanner.find_device_by_name(ESP32_BLE_NAME, timeout=10.0)
     if device is None:
@@ -96,42 +107,24 @@ async def ble_connect() -> BleakClient:
     print(f"  Connected to {device.name} ({device.address})")
     return client
 
+# ---------------------------------------------------------------------------
+# CV (file-based test using trained classifier)
+# ---------------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# CV Placeholders
-# ---------------------------------------------------------------------------
+OPP_STAGE1_LEFT_IMG  = r"cv_src\prof\HandPhotos\Testing\rock_01.png"
+OPP_STAGE1_RIGHT_IMG = r"cv_src\prof\HandPhotos\Testing\paper_01.png"
+OPP_STAGE2_IMG       = r"cv_src\prof\HandPhotos\Testing\scissors_01.png"
 
 def cv_detect_stage1() -> tuple[str, str]:
-    """
-    [CV PLACEHOLDER — Stage 1]
-    Capture a frame and return the two gestures the opponent is showing.
-    Replace with a real computer-vision call when available.
-
-    Returns:
-        (left_hand, right_hand): shape strings from {'R', 'P', 'S'}
-    """
-    h1 = random.choice(SHAPES)
-    h2 = random.choice(SHAPES)
+    h1, h2 = cv_bridge.detect_stage1_from_files(OPP_STAGE1_LEFT_IMG, OPP_STAGE1_RIGHT_IMG)
     print(f"  [CV]  Opponent Stage 1 detected: {SHAPE_NAMES[h1]} | {SHAPE_NAMES[h2]}")
     return h1, h2
 
 
 def cv_detect_stage2(opp_h1: str, opp_h2: str) -> str:
-    """
-    [CV PLACEHOLDER — Stage 2]
-    Detect which single hand the opponent kept after withdrawing one.
-    Replace with a real computer-vision call when available.
-
-    Args:
-        opp_h1, opp_h2: the opponent's original two hands
-
-    Returns:
-        kept_hand: the shape string the opponent kept
-    """
-    kept = random.choice([opp_h1, opp_h2])
+    kept = cv_bridge.detect_stage2_from_file(OPP_STAGE2_IMG)
     print(f"  [CV]  Opponent Stage 2 detected: kept {SHAPE_NAMES[kept]}")
     return kept
-
 
 # ---------------------------------------------------------------------------
 # Helper Utilities
@@ -315,7 +308,7 @@ async def main() -> None:
     print("   Optimal Strategy Player — MSE 3302B")
     print("=" * 52)
 
-    # Connect to ESP32 over BLE
+    # Connect to ESP32 over BLE (or None in NO_BLE test mode)
     client = await ble_connect()
 
     wins = losses = ties = 0
@@ -331,18 +324,22 @@ async def main() -> None:
             else:
                 ties += 1
 
-            total    = wins + losses + ties
+            total = wins + losses + ties
             win_rate = (wins / total * 100) if total else 0.0
-            print(f"\n  SCOREBOARD  W {wins}  |  T {ties}  |  L {losses}"
-                  f"   ({win_rate:.0f}% win rate)")
+            print(
+                f"\n  SCOREBOARD  W {wins}  |  T {ties}  |  L {losses}"
+                f"   ({win_rate:.0f}% win rate)"
+            )
 
             again = input("\n  Play again? [Y/N]: ").strip().upper()
             if again != "Y":
                 print(f"\n  Thanks for playing! Final: W {wins} | T {ties} | L {losses}\n")
                 break
+
     finally:
-        await client.disconnect()
-        print("  BLE disconnected.")
+        if client is not None:
+            await client.disconnect()
+            print("  BLE disconnected.")
 
 
 if __name__ == "__main__":
