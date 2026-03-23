@@ -45,11 +45,34 @@
 #include <BLEUtils.h>
 #include <BLE2902.h>
 #include <Adafruit_NeoPixel.h>
+#include <ESP32Servo.h>
 
 // ── Pin / LED configuration ──────────────────────────────────────────────────
 #define LED_PIN        21    // Data pin for the WS2812B smart LED
 #define LED_COUNT       1    // Number of LEDs in the strip / ring
 #define LED_BRIGHTNESS 255   // Global brightness cap (0–255)
+
+// - Servo GPIO pin defines - 
+#define PIN_L_WRIST    13
+#define PIN_L_FINGER   25
+#define PIN_L_THUMB    27
+
+#define PIN_R_WRIST    14
+#define PIN_R_FINGER   26
+#define PIN_R_THUMB    33
+
+// - Servo Angle Constants - 
+#define WRIST_RETRACTED   0
+#define WRIST_PLAYING    90
+
+#define FINGER_OPEN       0
+#define FINGER_SCISSORS  90
+#define FINGER_CLOSED   180
+
+#define THUMB_TUCKED      0
+#define THUMB_EXTENDED   90
+
+#define MOVE_DELAY_MS   400
 
 // ── BLE UUIDs — Nordic UART Service (NUS) ────────────────────────────────────
 // Must match the UUIDs used in rps.py on the laptop side.
@@ -70,6 +93,49 @@ BLEServer*          pServer    = nullptr;
 BLECharacteristic*  pTxChar    = nullptr;
 bool                deviceConnected = false;
 
+//created servo objects
+Servo leftWrist,  leftFinger,  leftThumb;
+Servo rightWrist, rightFinger, rightThumb;
+
+// Helper function
+static const char* signName(char sign) {
+  switch (sign) {
+    case '0': return "Withdrawn";
+    case '1': return "Rock";
+    case '2': return "Paper";
+    case '3': return "Scissors";
+    default:  return "Unknown";
+  }
+}
+
+// move hand function
+static void moveHand(Servo& wrist, Servo& finger, Servo& thumb, char sign) {
+  switch (sign) {
+    case '0':
+      wrist .write(WRIST_RETRACTED);
+      finger.write(FINGER_OPEN);
+      thumb .write(THUMB_TUCKED);
+      break;
+    case '1':
+      wrist .write(WRIST_PLAYING);
+      finger.write(FINGER_CLOSED);
+      thumb .write(THUMB_TUCKED);
+      break;
+    case '2':
+      wrist .write(WRIST_PLAYING);
+      finger.write(FINGER_OPEN);
+      thumb .write(THUMB_EXTENDED);
+      break;
+    case '3':
+      wrist .write(WRIST_PLAYING);
+      finger.write(FINGER_SCISSORS);
+      thumb .write(THUMB_TUCKED);
+      break;
+    default:
+      Serial.printf("[SERVO] Unknown sign '%c' — no movement.\n", sign);
+      break;
+  }
+}
 
 // ── BLE Server Callbacks ──────────────────────────────────────────────────────
 class ServerCallbacks : public BLEServerCallbacks {
@@ -94,21 +160,15 @@ class ServerCallbacks : public BLEServerCallbacks {
  * @param sign  '0'=Withdrawn  '1'=Rock  '2'=Paper  '3'=Scissors
  */
 void play(int hand, char sign) {
-  // ── TODO: Replace this section with servo/motor actuation ─────────────────
-  //
-  //   Example (once GPIO mapping is known):
-  //     if (hand == 0) {         // left arm motor
-  //       leftArmServo.write(angleForSign(sign));
-  //     } else {                 // right arm motor
-  //       rightArmServo.write(angleForSign(sign));
-  //     }
-  //
-  // ── LED placeholder — accumulate colour contribution ──────────────────────
-  // (Colour is applied in applyLED() after both hands are processed.)
+  Serial.printf("[SERVO] Hand=%s  Gesture=%s\n",
+                hand == 0 ? "LEFT" : "RIGHT", signName(sign));
 
-  Serial.printf("  play(hand=%d, sign=%c)\n", hand, sign);
+  if (hand == 0) {
+    moveHand(leftWrist,  leftFinger,  leftThumb,  sign);
+  } else {
+    moveHand(rightWrist, rightFinger, rightThumb, sign);
+  }
 }
-
 
 // ── applyLED() — Compute and display the blended LED colour ──────────────────
 /**
@@ -173,6 +233,7 @@ class RxCallbacks : public BLECharacteristicCallbacks {
     // ── Dispatch to play() for each hand ──────────────────────────────────
     play(0, leftSign);    // left  hand
     play(1, rightSign);   // right hand
+    delay(MOVE_DELAY_MS);      // ← wait for servos to reach position
 
     // ── Update LED ────────────────────────────────────────────────────────
     applyLED(leftSign, rightSign);
@@ -184,6 +245,25 @@ class RxCallbacks : public BLECharacteristicCallbacks {
 void setup() {
   Serial.begin(115200);
   Serial.println("\n[RPS-1] ESP32 firmware starting…");
+
+  // Servo init
+  ESP32PWM::allocateTimer(0);
+  ESP32PWM::allocateTimer(1);
+  ESP32PWM::allocateTimer(2);
+  ESP32PWM::allocateTimer(3);
+
+  leftWrist .setPeriodHertz(50); leftWrist .attach(PIN_L_WRIST,  500, 2400);
+  leftFinger.setPeriodHertz(50); leftFinger.attach(PIN_L_FINGER, 500, 2400);
+  leftThumb .setPeriodHertz(50); leftThumb .attach(PIN_L_THUMB,  500, 2400);
+
+  rightWrist .setPeriodHertz(50); rightWrist .attach(PIN_R_WRIST,  500, 2400);
+  rightFinger.setPeriodHertz(50); rightFinger.attach(PIN_R_FINGER, 500, 2400);
+  rightThumb .setPeriodHertz(50); rightThumb .attach(PIN_R_THUMB,  500, 2400);
+
+  play(0, '0');   // home both hands on boot
+  play(1, '0');
+  delay(MOVE_DELAY_MS);
+  Serial.println("[SERVO] All servos initialised and homed.");
 
   // ── LED init ──────────────────────────────────────────────────────────────
   strip.begin();
@@ -222,6 +302,14 @@ void setup() {
 
   Serial.printf("[BLE] Advertising as \"%s\"\n", DEVICE_NAME);
   Serial.println("[RPS-1] Ready — waiting for connection.");
+
+  delay(1000);
+
+  play(1, '0'); delay(1500);  // Withdrawn
+  play(1, '1'); delay(1500);  // Rock
+  play(1, '2'); delay(1500);  // Paper
+  play(1, '3'); delay(1500);  // Scissors
+  play(1, '0'); delay(1500);  // Back to Withdrawn
 }
 
 
