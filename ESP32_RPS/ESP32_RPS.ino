@@ -52,14 +52,15 @@
 #define LED_COUNT       1    // Number of LEDs in the strip / ring
 #define LED_BRIGHTNESS 255   // Global brightness cap (0–255)
 
-// - Servo GPIO pin defines - 
-#define PIN_L_WRIST    13
-#define PIN_L_FINGER   25
-#define PIN_L_THUMB    27
+// RIGHT HAND
+#define PIN_R_FINGER_A  26    // Index + Middle
+#define PIN_R_FINGER_B  25    // Ring + Pinky
+#define PIN_R_THUMB     33
 
-#define PIN_R_WRIST    14
-#define PIN_R_FINGER   26
-#define PIN_R_THUMB    33
+// LEFT HAND (for later)
+#define PIN_L_FINGER_A  14
+#define PIN_L_FINGER_B  13
+#define PIN_L_THUMB     27
 
 // - Servo Angle Constants - 
 #define WRIST_RETRACTED   0
@@ -94,8 +95,8 @@ BLECharacteristic*  pTxChar    = nullptr;
 bool                deviceConnected = false;
 
 //created servo objects
-Servo leftWrist,  leftFinger,  leftThumb;
-Servo rightWrist, rightFinger, rightThumb;
+Servo rightFingerA, rightFingerB, rightThumb;
+Servo leftFingerA,  leftFingerB,  leftThumb;
 
 // Helper function
 static const char* signName(char sign) {
@@ -108,33 +109,42 @@ static const char* signName(char sign) {
   }
 }
 
-// move hand function
-static void moveHand(Servo& wrist, Servo& finger, Servo& thumb, char sign) {
+//move hand function
+static void moveHand(Servo& fingerA, Servo& fingerB, Servo& thumb, char sign) {
+  int targetFinger, targetThumb;
+
   switch (sign) {
-    case '0':
-      wrist .write(WRIST_RETRACTED);
-      finger.write(FINGER_OPEN);
-      thumb .write(THUMB_TUCKED);
+    case '0':  // Withdrawn
+      targetFinger = FINGER_OPEN;
+      targetThumb  = THUMB_TUCKED;
       break;
-    case '1':
-      wrist .write(WRIST_PLAYING);
-      finger.write(FINGER_CLOSED);
-      thumb .write(THUMB_TUCKED);
+    case '1':  // Rock
+      targetFinger = FINGER_CLOSED;
+      targetThumb  = THUMB_TUCKED;
       break;
-    case '2':
-      wrist .write(WRIST_PLAYING);
-      finger.write(FINGER_OPEN);
-      thumb .write(THUMB_EXTENDED);
+    case '2':  // Paper
+      targetFinger = FINGER_OPEN;
+      targetThumb  = THUMB_EXTENDED;
       break;
-    case '3':
-      wrist .write(WRIST_PLAYING);
-      finger.write(FINGER_SCISSORS);
-      thumb .write(THUMB_TUCKED);
+    case '3':  // Scissors
+      targetFinger = FINGER_SCISSORS;
+      targetThumb  = THUMB_TUCKED;
       break;
     default:
       Serial.printf("[SERVO] Unknown sign '%c' — no movement.\n", sign);
-      break;
+      return;
   }
+
+  // Both finger servos move together (same angle), sequentially
+  fingerA.write(targetFinger);
+  delay(MOVE_DELAY_MS);
+
+  fingerB.write(targetFinger);
+  delay(MOVE_DELAY_MS);
+
+  // Thumb last
+  thumb.write(targetThumb);
+  delay(MOVE_DELAY_MS);
 }
 
 // ── BLE Server Callbacks ──────────────────────────────────────────────────────
@@ -164,9 +174,9 @@ void play(int hand, char sign) {
                 hand == 0 ? "LEFT" : "RIGHT", signName(sign));
 
   if (hand == 0) {
-    moveHand(leftWrist,  leftFinger,  leftThumb,  sign);
+    moveHand(leftFingerA,  leftFingerB,  leftThumb,  sign);
   } else {
-    moveHand(rightWrist, rightFinger, rightThumb, sign);
+    moveHand(rightFingerA, rightFingerB, rightThumb, sign);
   }
 }
 
@@ -233,8 +243,7 @@ class RxCallbacks : public BLECharacteristicCallbacks {
     // ── Dispatch to play() for each hand ──────────────────────────────────
     play(0, leftSign);    // left  hand
     play(1, rightSign);   // right hand
-    delay(MOVE_DELAY_MS);      // ← wait for servos to reach position
-
+    
     // ── Update LED ────────────────────────────────────────────────────────
     applyLED(leftSign, rightSign);
   }
@@ -252,13 +261,10 @@ void setup() {
   ESP32PWM::allocateTimer(2);
   ESP32PWM::allocateTimer(3);
 
-  leftWrist .setPeriodHertz(50); leftWrist .attach(PIN_L_WRIST,  500, 2400);
-  leftFinger.setPeriodHertz(50); leftFinger.attach(PIN_L_FINGER, 500, 2400);
-  leftThumb .setPeriodHertz(50); leftThumb .attach(PIN_L_THUMB,  500, 2400);
+  rightFingerA.setPeriodHertz(50); rightFingerA.attach(PIN_R_FINGER_A, 500, 2400);
+  rightFingerB.setPeriodHertz(50); rightFingerB.attach(PIN_R_FINGER_B, 500, 2400);
+  rightThumb  .setPeriodHertz(50); rightThumb  .attach(PIN_R_THUMB,    500, 2400);
 
-  rightWrist .setPeriodHertz(50); rightWrist .attach(PIN_R_WRIST,  500, 2400);
-  rightFinger.setPeriodHertz(50); rightFinger.attach(PIN_R_FINGER, 500, 2400);
-  rightThumb .setPeriodHertz(50); rightThumb .attach(PIN_R_THUMB,  500, 2400);
 
   play(0, '0');   // home both hands on boot
   play(1, '0');
