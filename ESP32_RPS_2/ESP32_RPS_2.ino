@@ -1,5 +1,5 @@
 /**
- * ESP32_RPS.ino
+ * ESP32_RPS_2.ino  —  MCU 2 (Right Arm)
  * Rock-Paper-Scissors-Minus-One (RPS-1) — ESP32 Firmware
  * MSE 3302B | Western University
  *
@@ -116,7 +116,7 @@
 // !! CHANGE THIS before uploading to each board !!
 // Right arm: "RPS-ESP32-R"
 // Left  arm: "RPS-ESP32-L"
-#define DEVICE_NAME "RPS-ESP32-R"
+#define DEVICE_NAME "RPS-ESP32-L"
 
 #define HAND_VALUE 125
 
