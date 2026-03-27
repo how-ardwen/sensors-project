@@ -1,5 +1,5 @@
 /**
- * ESP32_RPS_2.ino  —  MCU 2 (Right Arm)
+ * ESP32_RPS_L.ino
  * Rock-Paper-Scissors-Minus-One (RPS-1) — ESP32 Firmware
  * MSE 3302B | Western University
  *
@@ -222,11 +222,11 @@ static void moveHand(Servo& fingerA, Servo& fingerB, Servo& thumb, char sign) {
       return;
   }
 
-  fingerA.write(targetFingerA);
+  fingerA.write(180 - targetFingerA);
   delay(MOVE_DELAY_MS);
-  fingerB.write(targetFingerB);
+  fingerB.write(180 - targetFingerB);
   delay(MOVE_DELAY_MS);
-  thumb.write(targetThumb);
+  thumb.write(180 - targetThumb);
   delay(MOVE_DELAY_MS);
 }
 
@@ -341,20 +341,20 @@ void setup() {
   ESP32PWM::allocateTimer(2);
   ESP32PWM::allocateTimer(3);
 
-  rightFingerA.setPeriodHertz(50); rightFingerA.attach(PIN_R_FINGER_A, 500, 2400);
-  rightFingerB.setPeriodHertz(50); rightFingerB.attach(PIN_R_FINGER_B, 500, 2400);
-  rightThumb  .setPeriodHertz(50); rightThumb  .attach(PIN_R_THUMB,    500, 2400);
+  leftFingerA.setPeriodHertz(50); leftFingerA.attach(PIN_L_FINGER_A, 500, 2400);
+  leftFingerB.setPeriodHertz(50); leftFingerB.attach(PIN_L_FINGER_B, 500, 2400);
+  leftThumb  .setPeriodHertz(50); leftThumb  .attach(PIN_L_THUMB,    500, 2400);
 
-  play(1, '0');
-  Serial.println("[SERVO] Right hand homed to Withdrawn.");
+  play(0, '0');
+  Serial.println("[SERVO] Left hand homed to Withdrawn.");
 
   // ── Boot test sequence ────────────────────────────────────────────────────
   delay(1000);
   Serial.println("[TEST] Starting boot gesture sequence...");
-  play(1, '1'); delay(1500);
-  play(1, '2'); delay(1500);
-  play(1, '3'); delay(1500);
-  play(1, '0'); delay(1500);
+  play(0, '1'); delay(1500);
+  play(0, '2'); delay(1500);
+  play(0, '3'); delay(1500);
+  play(0, '0'); delay(1500);
   Serial.println("[TEST] Boot sequence complete.");
 
   // ── LED init ──────────────────────────────────────────────────────────────

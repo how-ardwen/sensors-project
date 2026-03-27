@@ -33,8 +33,8 @@ from bleak import BleakClient, BleakScanner
 
 # Device names must match DEVICE_NAME in each .ino file
 BLE_DEVICES = {
-    "arm_left":  "RPS-ESP32-L",   # Left arm  — ESP32_RPS/ESP32_RPS.ino
-    "arm_right": "RPS-ESP32-R",   # Right arm — ESP32_RPS_2/ESP32_RPS_2.ino
+    "arm_left":  "RPS-ESP32-L",   # Left arm  — ESP32_RPS_L/ESP32_RPS_L.ino
+    "arm_right": "RPS-ESP32-R",   # Right arm — ESP32_RPS_R/ESP32_RPS_R.ino
 }
 
 # Both MCUs share the same Nordic UART Service characteristic UUID

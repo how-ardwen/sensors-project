@@ -1,5 +1,5 @@
 /**
- * ESP32_RPS.ino
+ * ESP32_RPS_R.ino
  * Rock-Paper-Scissors-Minus-One (RPS-1) — ESP32 Firmware
  * MSE 3302B | Western University
  *
