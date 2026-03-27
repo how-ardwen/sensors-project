@@ -140,32 +140,14 @@ async def ble_disconnect_all(clients: dict[str, BleakClient]) -> None:
 # ---------------------------------------------------------------------------
 
 def cv_detect_stage1() -> tuple[str, str]:
-    """
-    [CV PLACEHOLDER — Stage 1]
-    Detect the two gestures the opponent is showing.
-    Replace with a real computer-vision call when available.
-
-    Returns:
-        (left_hand, right_hand): shape strings from {'R', 'P', 'S'}
-    """
-    h1 = random.choice(SHAPES)
-    h2 = random.choice(SHAPES)
-    print(f"  [CV Stage 1] Opponent: {SHAPE_NAMES[h1]} | {SHAPE_NAMES[h2]}")
+    input("Press Enter when ready to show Stage 1 hands")
+    h1 = input("Enter your left hand: ")
+    h2 = input("Enter your right hand: ")
     return h1, h2
 
 
 def cv_detect_stage2(opp_h1: str, opp_h2: str) -> str:
-    """
-    [CV PLACEHOLDER — Stage 2]
-    Detect which single hand the opponent kept after withdrawing one.
-    Replace with a real computer-vision call when available.
-
-    Returns:
-        kept_hand: the shape string the opponent kept
-    """
-    kept = random.choice([opp_h1, opp_h2])
-    print(f"  [CV Stage 2] Opponent kept: {SHAPE_NAMES[kept]}")
-    return kept
+    return input("Enter the hand opponent kept: ")
 
 
 # ---------------------------------------------------------------------------
