@@ -247,20 +247,34 @@ def optimal_stage2(
 # Game Round  (async — drives the full hardware pipeline)
 # ---------------------------------------------------------------------------
 
-async def play_round(clients: dict[str, BleakClient]) -> int:
+async def play_round(clients: dict[str, BleakClient], last_withdrawn: str = None) -> tuple[int, str]:
     """
-    Execute one complete round of RPS-1 over the 3-MCU hardware pipeline.
-
-    Steps:
-      1. Select Stage 1 hands  →  send H[sign]\\n to MCU 1 and MCU 2
-      2. CV detects opponent's Stage 1 hands  [PLACEHOLDER]
-      3. Decide which hand to withdraw  →  send S[arm]\\n to MCU 3
-      4. CV detects opponent's kept hand  [PLACEHOLDER]
-      5. Determine and return outcome (1=win, 0=tie, -1=loss)
+    Execute one complete round of RPS-1.
+    Returns (result_payoff, withdrawing_role_this_round).
     """
     sep = "─" * 52
     print(f"\n{sep}")
 
+    # ── Step 0: Reset Hardware — return only the withdrawn arm ──────
+    print("\n  ── Resetting Hardware ──")
+    reset_gesture = build_gesture_packet("P", "P")
+    reset_withdraw_pkt = build_withdraw_packet(False)
+    
+    # Reset fingers on both boards
+    tasks = [
+        ble_send(clients["arm_left"],  reset_gesture, "MCU1-Left-Neutral"),
+        ble_send(clients["arm_right"], reset_gesture, "MCU2-Right-Neutral"),
+    ]
+    
+    # Only return the arm if it was actually withdrawn
+    if last_withdrawn:
+        tasks.append(ble_send(clients[last_withdrawn], reset_withdraw_pkt, "Reset-Return"))
+        print(f"  Returning {last_withdrawn} to play area…")
+    
+    await asyncio.gather(*tasks)
+    await asyncio.sleep(2.0 if last_withdrawn else 0.5)
+
+    input("Press Enter to continue to Stage 1")
     # ── Step 1: Stage 1 — command both arm MCUs simultaneously ───────────────
     print("\n  ── Stage 1: Hand Selection ──")
     my_left, my_right = select_stage1_hands()
@@ -293,7 +307,6 @@ async def play_round(clients: dict[str, BleakClient]) -> int:
 
     # Send W1 to whichever MCU owns the withdrawing arm
     withdrawing_role = "arm_left" if withdraw == my_left else "arm_right"
-    keeping_role     = "arm_right" if withdrawing_role == "arm_left" else "arm_left"
     label = "MCU1-Left" if withdrawing_role == "arm_left" else "MCU2-Right"
 
     await ble_send(clients[withdrawing_role], build_withdraw_packet(True), label)
@@ -312,7 +325,7 @@ async def play_round(clients: dict[str, BleakClient]) -> int:
     print(f"  RESULT: {RESULT_LABEL[result]}")
     print(f"{sep}")
 
-    return result
+    return result, withdrawing_role
 
 
 # ---------------------------------------------------------------------------
@@ -328,10 +341,11 @@ async def main() -> None:
     clients = await ble_connect_all()
 
     wins = losses = ties = 0
+    withdrawn_arm = None
 
     try:
         while True:
-            result = await play_round(clients)
+            result, withdrawn_arm = await play_round(clients, withdrawn_arm)
 
             if result == 1:
                 wins += 1

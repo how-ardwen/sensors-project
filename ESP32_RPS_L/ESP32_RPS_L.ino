@@ -80,9 +80,9 @@
 #define PIN_R_FINGER_B  25    // Right: Ring  + Pinky
 #define PIN_R_THUMB     33    // Right: Thumb
 
-#define PIN_L_FINGER_A  14    // Left: Index + Middle  (not connected yet)
-#define PIN_L_FINGER_B  13    // Left: Ring  + Pinky   (not connected yet)
-#define PIN_L_THUMB     27    // Left: Thumb            (not connected yet)
+#define PIN_L_FINGER_A  26    // Left: Index + Middle  (not connected yet)
+#define PIN_L_FINGER_B  27    // Left: Ring  + Pinky   (not connected yet)
+#define PIN_L_THUMB     33    // Left: Thumb            (not connected yet)
 
 
 // ── Stepper GPIO assignments ──────────────────────────────────────────────────
@@ -96,7 +96,7 @@
 #define FINGER_OPEN    180    // String pulled — fingers extended
 #define FINGER_CLOSED    0    // String slack  — fingers curl
 
-#define THUMB_TUCKED   180    // Thumb closed
+#define THUMB_TUCKED   150    // Thumb closed
 #define THUMB_EXTENDED   0    // Thumb open
 
 #define MOVE_DELAY_MS  500    // ms to wait between each servo movement
@@ -169,7 +169,7 @@ void stepperOff() {
 
 // ── withdraw() — rotate stepper to withdraw or return the arm ─────────────────
 void withdraw(bool out) {
-  int direction = out ? 1 : -1;
+  int direction = out ? -1 : 1;
   Serial.printf("[STEPPER] %s arm — %d steps\n",
                 out ? "Withdrawing" : "Returning", WITHDRAW_STEPS);
   for (int i = 0; i < WITHDRAW_STEPS; i++) {
